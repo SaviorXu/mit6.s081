@@ -76,14 +76,32 @@ sys_sleep(void)
 }
 
 
-#ifdef LAB_PGTBL
+//#ifdef LAB_PGTBL
 int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  uint64 stva,ua;
+  int num;
+  if(argaddr(0,&stva)<0)
+  {
+    printf("error1\n");
+    return -1;
+  }
+  if(argint(1,&num)<0)
+  {
+    printf("error2\n");
+    return -1;
+  } 
+  if(argaddr(2,&ua)<0)
+  {
+    printf("error3\n");
+    return -1;
+  }
+  pgaccess(stva,num,ua);
   return 0;
 }
-#endif
+//#endif
 
 uint64
 sys_kill(void)

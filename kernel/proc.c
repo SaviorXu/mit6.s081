@@ -127,6 +127,15 @@ found:
     return 0;
   }
 
+  if((p->usys = (struct usyscall*)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+  memset(p->usys,0,PGSIZE);
+  p->usys->pid=p->pid;
+
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -141,6 +150,7 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+
   return p;
 }
 
@@ -153,8 +163,11 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+  if(p->usys)
+    kfree((void*)p->usys);
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  p->usys=0;
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -196,6 +209,12 @@ proc_pagetable(struct proc *p)
     return 0;
   }
 
+  if(mappages(pagetable,USYSCALL,PGSIZE,(uint64)(p->usys),PTE_R | PTE_U)<0)
+  {
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmunmap(pagetable, TRAPFRAME, 1, 0);
+    uvmfree(pagetable,0);
+  }
   return pagetable;
 }
 
@@ -206,6 +225,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable,USYSCALL,1,0);
   uvmfree(pagetable, sz);
 }
 
@@ -653,4 +673,24 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+//savior
+void pgaccess(uint64 stva,int num,uint64 ua)
+{
+  struct proc *p=myproc();
+  uint32 tmp=0;
+  int sum=0;
+  for(int i=0;i<num;i++)
+  {
+    pte_t *pte=walk(p->pagetable,stva,0);
+    if(*pte & PTE_A)//PTE_A==1
+    {
+      tmp=tmp|(1<<i);
+      sum++;
+      *pte=(*pte)&~(PTE_A);
+    }
+    stva=stva+PGSIZE;
+  }
+  copyout(p->pagetable,ua,(char*)&tmp,sizeof(tmp));
 }
