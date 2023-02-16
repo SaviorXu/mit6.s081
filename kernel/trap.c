@@ -49,7 +49,8 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
+
+  printf("r_scause()=%d\n",r_scause());
   if(r_scause() == 8){
     // system call
 
@@ -71,6 +72,24 @@ usertrap(void)
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
+
+    // if(r_scause()==15)
+    // {
+    //   pte_t *pte;
+    //   pte=walk(p->pagetable,r_stval(),0);
+    //   uint flags=PTE_FLAGS(*pte);
+    //   if(flags&PTE_COW)
+    //   {
+    //     uint64 pa;
+    //     char *mem=kalloc();
+    //     pa=PTE2PA(*pte);
+    //     memmove(mem,(char*)pa,PGSIZE);
+    //     flags&=~(PTE_COW);
+    //     flags|=(PTE_W);
+    //     uvmunmap(p->pagetable,r_stval(),1,1);
+    //     mappages(p->pagetable,r_stval(),PGSIZE,(uint64)mem,flags);
+    //   }
+    // }
   }
 
   if(p->killed)
@@ -78,7 +97,18 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
+  {
     yield();
+    myproc()->last_ticks++;
+    if(myproc()->ticks==myproc()->last_ticks&&myproc()->sysflag==0)
+    {
+      myproc()->last_ticks=0;
+      memmove(&(myproc()->save_return),myproc()->trapframe,sizeof(struct trapframe));
+      myproc()->trapframe->epc=myproc()->handler;
+      myproc()->sysflag=1;
+    }
+  }
+    
 
   usertrapret();
 }
@@ -126,6 +156,7 @@ usertrapret(void)
   // and switches to user mode with sret.
   uint64 fn = TRAMPOLINE + (userret - trampoline);
   ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
+
 }
 
 // interrupts and exceptions from kernel code go here via kernelvec,

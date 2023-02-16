@@ -23,6 +23,11 @@ struct {
   struct run *freelist;
 } kmem;
 
+struct{
+  struct spinlock lock;
+  uint ref[32768];
+}count;
+
 void
 kinit()
 {
@@ -50,6 +55,14 @@ kfree(void *pa)
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
+  
+  // acquire(&count.lock);
+  // count.ref[(uint64)(pa-KERNBASE)/PGSIZE]--;
+  // release(&count.lock);
+  // if(count.ref[(uint64)(pa-KERNBASE)/PGSIZE]!=0)
+  // {
+  //   return;
+  // }
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
@@ -78,5 +91,17 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+
+  // acquire(&count.lock);
+  // count.ref[(uint64)(r-KERNBASE)/PGSIZE]=1;
+  // release(&count.lock);
+
   return (void*)r;
+}
+
+void AddRef(uint64 index)
+{
+  acquire(&count.lock);
+  count.ref[index]++;
+  release(&count.lock);
 }
