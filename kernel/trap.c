@@ -50,7 +50,7 @@ usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
 
-  printf("r_scause()=%d\n",r_scause());
+  //printf("r_scause()=%d\n",r_scause());
   if(r_scause() == 8){
     // system call
 
@@ -69,27 +69,22 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    p->killed = 1;
-
-    // if(r_scause()==15)
-    // {
-    //   pte_t *pte;
-    //   pte=walk(p->pagetable,r_stval(),0);
-    //   uint flags=PTE_FLAGS(*pte);
-    //   if(flags&PTE_COW)
-    //   {
-    //     uint64 pa;
-    //     char *mem=kalloc();
-    //     pa=PTE2PA(*pte);
-    //     memmove(mem,(char*)pa,PGSIZE);
-    //     flags&=~(PTE_COW);
-    //     flags|=(PTE_W);
-    //     uvmunmap(p->pagetable,r_stval(),1,1);
-    //     mappages(p->pagetable,r_stval(),PGSIZE,(uint64)mem,flags);
-    //   }
-    // }
+    // printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    // printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    // p->killed = 1;
+    
+    if(r_scause()==15)
+    {
+      if(cow_page_fault(p->pagetable,r_stval())<0)
+      {
+        p->killed=1;
+      }
+    }else
+    {
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    }
   }
 
   if(p->killed)

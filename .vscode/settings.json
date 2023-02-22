@@ -1,6 +1,10 @@
 {
     "files.associations": {
         "ostream": "c",
-        "vector": "c"
+        "vector": "c",
+        "__bit_reference": "c",
+        "bitset": "c",
+        "chrono": "c",
+        "unordered_map": "c"
     }
 }

@@ -25,12 +25,13 @@ struct {
 
 struct{
   struct spinlock lock;
-  uint ref[32768];
+  uint ref[PGNUM];
 }count;
 
 void
 kinit()
 {
+  initlock(&count.lock,"count");
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
 }
@@ -41,7 +42,11 @@ freerange(void *pa_start, void *pa_end)
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  {
+    count.ref[(uint64)(p-KERNBASE)/PGSIZE]=1;
     kfree(p);
+  }
+    
 }
 
 // Free the page of physical memory pointed at by v,
@@ -55,14 +60,16 @@ kfree(void *pa)
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
-  
-  // acquire(&count.lock);
-  // count.ref[(uint64)(pa-KERNBASE)/PGSIZE]--;
-  // release(&count.lock);
-  // if(count.ref[(uint64)(pa-KERNBASE)/PGSIZE]!=0)
-  // {
-  //   return;
-  // }
+
+  int index=(uint64)(pa-KERNBASE)/PGSIZE;
+  acquire(&count.lock);
+  count.ref[index]--;
+  release(&count.lock);
+  //printf("kfree:index=%d count.ref[index]=%d\n",index,count.ref[index]);
+  if(count.ref[index]>0)
+  {
+    return;
+  }
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
@@ -83,25 +90,40 @@ kalloc(void)
 {
   struct run *r;
 
+  //printf("1\n");
   acquire(&kmem.lock);
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
   release(&kmem.lock);
-
+  //printf("2\n");
   if(r)
+  {
     memset((char*)r, 5, PGSIZE); // fill with junk
-
-  // acquire(&count.lock);
-  // count.ref[(uint64)(r-KERNBASE)/PGSIZE]=1;
-  // release(&count.lock);
-
+    uint64 index=(uint64)((uint64)r-(uint64)KERNBASE)/PGSIZE;
+    //printf("r=%p index=%d\n",r,index);
+    acquire(&count.lock);
+    count.ref[index]=1;
+    release(&count.lock);
+  }
+    
+  //printf("3\n");
+  
+  
+  //printf("4\n");
   return (void*)r;
 }
 
 void AddRef(uint64 index)
 {
+  //printf("index=%d\n",index);
   acquire(&count.lock);
   count.ref[index]++;
   release(&count.lock);
+}
+
+int GetRef(uint64 pa)
+{
+  uint64 index=(pa-KERNBASE)/PGSIZE;
+  return count.ref[index];
 }

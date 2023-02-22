@@ -1,7 +1,3 @@
-//
-// tests for copy-on-write fork() assignment.
-//
-
 #include "kernel/types.h"
 #include "kernel/memlayout.h"
 #include "user/user.h"
@@ -55,29 +51,34 @@ threetest()
 {
   uint64 phys_size = PHYSTOP - KERNBASE;
   int sz = phys_size / 4;
+  // sz/4096=8192;
   int pid1, pid2;
 
   printf("three: ");
   
   char *p = sbrk(sz);
+  //printf("p addr=%p\n",p);
   if(p == (char*)0xffffffffffffffffL){
     printf("sbrk(%d) failed\n", sz);
     exit(-1);
   }
 
   pid1 = fork();
+  //printf("after fork\n");
   if(pid1 < 0){
     printf("fork failed\n");
     exit(-1);
   }
-  if(pid1 == 0){
+  if(pid1 == 0){ 
     pid2 = fork();
     if(pid2 < 0){
       printf("fork failed");
       exit(-1);
     }
-    if(pid2 == 0){
+    if(pid2 == 0){//孙子进程
+      //sleep(30);
       for(char *q = p; q < p + (sz/5)*4; q += 4096){
+        //printf("addr q=%p\n",q);
         *(int*)q = getpid();
       }
       for(char *q = p; q < p + (sz/5)*4; q += 4096){
@@ -86,14 +87,19 @@ threetest()
           exit(-1);
         }
       }
+      //printf("sunzi exit\n");
       exit(-1);
     }
+    //子进程
+    //sleep(60);
     for(char *q = p; q < p + (sz/2); q += 4096){
       *(int*)q = 9999;
     }
+    //printf("son exit\n");
     exit(0);
   }
 
+  //父进程
   for(char *q = p; q < p + sz; q += 4096){
     *(int*)q = getpid();
   }

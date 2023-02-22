@@ -1,3 +1,4 @@
+
 //
 // File-system system calls.
 // Mostly argument checking, since we don't trust
@@ -463,9 +464,14 @@ sys_pipe(void)
   struct proc *p = myproc();
 
   if(argaddr(0, &fdarray) < 0)
+  {
     return -1;
+  }
   if(pipealloc(&rf, &wf) < 0)
+  {
     return -1;
+  }
+    
   fd0 = -1;
   if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){
     if(fd0 >= 0)
@@ -480,6 +486,7 @@ sys_pipe(void)
     p->ofile[fd1] = 0;
     fileclose(rf);
     fileclose(wf);
+    //printf("2 return -1\n");
     return -1;
   }
   return 0;

@@ -5,7 +5,7 @@
 #include "param.h"
 #include "memlayout.h"
 #include "spinlock.h"
-#include "proc.h"
+#include "proc.h" 
 
 uint64
 sys_exit(void)
@@ -43,12 +43,15 @@ sys_sbrk(void)
 {
   int addr;
   int n;
-
+  //printf("sbrk\n"); 
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
   if(growproc(n) < 0)
+  {
     return -1;
+  }
+  //printf("after growproc()\n");
   return addr;
 }
 
@@ -70,7 +73,7 @@ sys_sleep(void)
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
-  backtrace();
+  //backtrace();
   return 0;
 }
 

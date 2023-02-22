@@ -144,5 +144,7 @@ void backtrace(void)
     last=*(uint64*)(cur-8);
     printf("%p\n",last);
     cur=*(uint64*)(cur-16);
+    //printf("cur=%p top=%p\n",cur,top);
   }
+  //printf("backtrace finish\n");
 }

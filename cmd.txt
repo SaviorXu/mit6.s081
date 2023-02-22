@@ -1,0 +1,9 @@
+file user/_cowtest
+set follow-fork-mode child
+set detach-on-fork off
+b 54
+b 68
+b 86
+b 89
+b 95
+b 118

@@ -127,7 +127,7 @@ $K/kernel: $(OBJS) $(OBJS_KCSAN) $K/kernel.ld $U/initcode
 $(OBJS): EXTRAFLAG := $(KCSANFLAG)
 
 $K/%.o: $K/%.c
-	$(CC) $(CFLAGS) $(EXTRAFLAG) -c -o $@ $<
+	$(CC) $(CFLAGS) $(EXTRAFLAG) -c -o $@ $< 
 
 
 $U/initcode: $U/initcode.S

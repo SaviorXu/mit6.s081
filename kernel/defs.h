@@ -64,6 +64,7 @@ void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
 void            AddRef(uint64 index);
+int             GetRef(uint64 pa);
 
 // log.c
 void            initlog(int, struct superblock*);
@@ -173,6 +174,7 @@ int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 pte_t *         walk(pagetable_t pagetable, uint64 va, int alloc);
+int             cow_page_fault(pagetable_t pagetable,uint64 va);
 
 // plic.c
 void            plicinit(void);

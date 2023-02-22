@@ -588,6 +588,7 @@ writebig(char *s)
     }
   }
 
+  
   close(fd);
 
   fd = open("big", O_RDONLY);
@@ -2715,6 +2716,7 @@ execout(char *s)
 int
 countfree()
 {
+  //printf("before countfree\n");
   int fds[2];
 
   if(pipe(fds) < 0){
@@ -2723,6 +2725,7 @@ countfree()
   }
   
   int pid = fork();
+  //printf("pid=%d\n",pid);
 
   if(pid < 0){
     printf("fork failed in countfree()\n");
@@ -2733,8 +2736,10 @@ countfree()
     close(fds[0]);
     
     while(1){
+
       uint64 a = (uint64) sbrk(4096);
       if(a == 0xffffffffffffffff){
+        //printf("break\n");
         break;
       }
 
@@ -2744,6 +2749,7 @@ countfree()
       // report back one more page.
       if(write(fds[1], "x", 1) != 1){
         printf("write() failed in countfree()\n");
+        printf("exit\n");
         exit(1);
       }
     }
@@ -2756,7 +2762,10 @@ countfree()
   int n = 0;
   while(1){
     char c;
+
+    //printf("pid!=0 before\n");
     int cc = read(fds[0], &c, 1);
+    //printf("pid!=0 after\n");
     if(cc < 0){
       printf("read() failed in countfree()\n");
       exit(1);
@@ -2769,6 +2778,7 @@ countfree()
   close(fds[0]);
   wait((int*)0);
   
+  //printf("after count\n");
   return n;
 }
 
@@ -2833,7 +2843,7 @@ main(int argc, char *argv[])
     {reparent2, "reparent2"},
     {pgbug, "pgbug" },
     {sbrkbugs, "sbrkbugs" },
-    // {badwrite, "badwrite" },
+    {badwrite, "badwrite" },
     {badarg, "badarg" },
     {reparent, "reparent" },
     {twochildren, "twochildren"},
@@ -2864,7 +2874,7 @@ main(int argc, char *argv[])
     {stacktest, "stacktest"},
     {opentest, "opentest"},
     {writetest, "writetest"},
-    {writebig, "writebig"},
+    {writebig, "writebig"},//有bug
     {createtest, "createtest"},
     {openiputtest, "openiput"},
     {exitiputtest, "exitiput"},
@@ -2884,6 +2894,7 @@ main(int argc, char *argv[])
     { 0, 0},
   };
 
+  //printf("continuous=%d\n",continuous);
   if(continuous){
     printf("continuous usertests starting\n");
     while(1){
@@ -2913,6 +2924,8 @@ main(int argc, char *argv[])
   int free0 = countfree();
   int free1 = 0;
   int fail = 0;
+
+  //printf("after countfree\n");
   for (struct test *t = tests; t->s != 0; t++) {
     if((justone == 0) || strcmp(t->s, justone) == 0) {
       if(!run(t->f, t->s))

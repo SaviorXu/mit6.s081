@@ -265,6 +265,7 @@ growproc(int n)
   struct proc *p = myproc();
 
   sz = p->sz;
+  //printf("proc.c growproc n=%d\n",n);
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
