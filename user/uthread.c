@@ -10,15 +10,35 @@
 #define STACK_SIZE  8192
 #define MAX_THREAD  4
 
+struct calleeRegister
+{
+  uint64 ra;
+  uint64 sp;
+  uint64 s0;
+  uint64 s1;
+  uint64 s2;
+  uint64 s3;
+  uint64 s4;
+  uint64 s5;
+  uint64 s6;
+  uint64 s7;
+  uint64 s8;
+  uint64 s9;
+  uint64 s10;
+  uint64 s11;
+};
+
 
 struct thread {
   char       stack[STACK_SIZE]; /* the thread's stack */
   int        state;             /* FREE, RUNNING, RUNNABLE */
+  struct calleeRegister reg;           
 };
 struct thread all_thread[MAX_THREAD];
 struct thread *current_thread;
-extern void thread_switch(uint64, uint64);
-              
+//extern void thread_switch(uint64,struct calleeRegister*,uint64,struct calleeRegister*);
+extern void thread_switch(uint64,uint64);
+             
 void 
 thread_init(void)
 {
@@ -34,9 +54,11 @@ thread_init(void)
 void 
 thread_schedule(void)
 {
+  //printf("thread_schedule\n");
   struct thread *t, *next_thread;
 
   /* Find another runnable thread. */
+  // printf("next_thread=0\n");
   next_thread = 0;
   t = current_thread + 1;
   for(int i = 0; i < MAX_THREAD; i++){
@@ -62,6 +84,11 @@ thread_schedule(void)
      * Invoke thread_switch to switch from t to next_thread:
      * thread_switch(??, ??);
      */
+    //printf("thread_switch\n");
+    //printf("t->reg->ra=%p\n",current_thread->reg->ra);
+    //thread_switch((uint64)t->stack,t->reg,(uint64)current_thread->stack,current_thread->reg);
+    thread_switch((uint64)&t->reg,(uint64)&current_thread->reg);
+
   } else
     next_thread = 0;
 }
@@ -75,13 +102,30 @@ thread_create(void (*func)())
     if (t->state == FREE) break;
   }
   t->state = RUNNABLE;
+  
   // YOUR CODE HERE
+  
+  
+  //t->reg=malloc(sizeof(struct calleeRegister));
+  t->reg.ra=(uint64)func;
+  t->reg.sp=(uint64)t->stack+STACK_SIZE;
+  //printf("create ra=%p\n",t->reg->ra);
+ 
+  // int pid=fork();
+  // if(pid==0)
+  // {
+  //   while(1)
+  //   {
+
+  //   }
+  // }
 }
 
 void 
 thread_yield(void)
 {
   current_thread->state = RUNNABLE;
+  //printf("thread_yield\n");
   thread_schedule();
 }
 
@@ -155,8 +199,11 @@ main(int argc, char *argv[])
   a_n = b_n = c_n = 0;
   thread_init();
   thread_create(thread_a);
+  printf("a\n");
   thread_create(thread_b);
+  printf("b\n");
   thread_create(thread_c);
+  printf("c\n");
   thread_schedule();
   exit(0);
 }

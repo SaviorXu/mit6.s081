@@ -439,7 +439,6 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
@@ -498,10 +497,10 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+  //printf("yield:pid=%d to runnable\n",p->pid);
   sched();
   release(&p->lock);
 }
-
 // A fork child's very first scheduling by scheduler()
 // will swtch to forkret.
 void
