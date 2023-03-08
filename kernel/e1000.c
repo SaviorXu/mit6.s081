@@ -93,7 +93,7 @@ e1000_init(uint32 *xregs)
 }
 
 int
-e1000_transmit(struct mbuf *m)
+e1000_transmit(struct mbuf *m)//send packet
 {
   //
   // Your code here.
@@ -102,12 +102,28 @@ e1000_transmit(struct mbuf *m)
   // the TX descriptor ring so that the e1000 sends it. Stash
   // a pointer so that it can be freed after sending.
   //
-  
+  //printf("transmit\n");
+  int index=regs[E1000_TDT];
+  if((tx_ring[index].status & E1000_TXD_STAT_DD)==0)
+  {
+    return -1;
+  }
+  if(tx_mbufs[index])
+  {
+    mbuffree(tx_mbufs[index]);
+  }
+  tx_mbufs[index]=m;
+  tx_ring[index].addr=(uint64)m->head;
+  tx_ring[index].length=m->len;
+  tx_ring[index].cmd=E1000_TXD_CMD_EOP|E1000_TXD_CMD_RS;
+  //printf("transmit m->len=%d\n",m->len);
+  regs[E1000_TDT]=(index+1)%TX_RING_SIZE;
+  //printf("transmit finish\n");
   return 0;
 }
 
 static void
-e1000_recv(void)
+e1000_recv(void) //receive packet from ethernet
 {
   //
   // Your code here.
@@ -115,6 +131,25 @@ e1000_recv(void)
   // Check for packets that have arrived from the e1000
   // Create and deliver an mbuf for each packet (using net_rx()).
   //
+  while(1)
+  {
+    uint32 index=(regs[E1000_RDT]+1)%RX_RING_SIZE;
+    if((rx_ring[index].status & E1000_RXD_STAT_DD)==0)//status代表了一系列的位标志，因此需要用与运算
+    {
+     break;
+    }
+    rx_mbufs[index]->len=rx_ring[index].length;
+    //rx_mbufs[index]->head=(char*)rx_ring[index].addr;
+    net_rx(rx_mbufs[index]);
+    rx_mbufs[index]=mbufalloc(0);
+    if(rx_mbufs[index]==0)
+    {
+      return;
+    }
+    rx_ring[index].addr=(uint64)rx_mbufs[index]->head;
+    rx_ring[index].status=0;
+    regs[E1000_RDT]=index;
+  }
 }
 
 void

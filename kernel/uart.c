@@ -94,7 +94,7 @@ uartputc(int c)
   }
 
   while(1){
-    if(uart_tx_w == uart_tx_r + UART_TX_BUF_SIZE){
+    if(uart_tx_w == uart_tx_r + UART_TX_BUF_SIZE){//表示未读，只写了。写满了整个buffer
       // buffer is full.
       // wait for uartstart() to open up space in the buffer.
       sleep(&uart_tx_r, &uart_tx_lock);
