@@ -108,6 +108,7 @@ test0()
       exit(1);
     }
   }
+  //printf("before fork\n");
   m = ntas(0);
   for(int i = 0; i < NCHILD; i++){
     dir[0] = '0' + i;

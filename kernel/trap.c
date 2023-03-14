@@ -206,6 +206,7 @@ devintr()
 
     if(cpuid() == 0){
       clockintr();
+      
     }
     
     // acknowledge the software interrupt by clearing
