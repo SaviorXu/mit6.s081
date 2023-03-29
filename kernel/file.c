@@ -93,6 +93,9 @@ filestat(struct file *f, uint64 addr)
   if(f->type == FD_INODE || f->type == FD_DEVICE){
     ilock(f->ip);
     stati(f->ip, &st);
+    // char content[MAXPATH];
+    // readi(f->ip,0,(uint64)content,0,MAXPATH);
+    // printf("ip->node->content=%s\n",content);
     iunlock(f->ip);
     if(copyout(p->pagetable, addr, (char *)&st, sizeof(st)) < 0)
       return -1;
@@ -168,6 +171,7 @@ filewrite(struct file *f, uint64 addr, int n)
 
       if(r != n1){
         // error from writei
+        //printf("error r=%d n1=%d\n",r,n1);
         break;
       }
       i += r;

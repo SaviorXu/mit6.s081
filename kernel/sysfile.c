@@ -117,7 +117,7 @@ sys_fstat(void)
 
 // Create the path new as a link to the same inode as old.
 uint64
-sys_link(void)
+sys_link(void)//创建一个硬链接
 {
   char name[DIRSIZ], new[MAXPATH], old[MAXPATH];
   struct inode *dp, *ip;
@@ -126,24 +126,25 @@ sys_link(void)
     return -1;
 
   begin_op();
-  if((ip = namei(old)) == 0){
+  if((ip = namei(old)) == 0){ //namei函数调用namex(old,0,name);
     end_op();
     return -1;
   }
 
   ilock(ip);
-  if(ip->type == T_DIR){
+  if(ip->type == T_DIR){//不能为目录创建硬链接
     iunlockput(ip);
     end_op();
     return -1;
   }
 
-  ip->nlink++;
-  iupdate(ip);
+  ip->nlink++;//使其链接计数+1
+  iupdate(ip);//因为修改了链接计数，需要将其重新写到磁盘上
   iunlock(ip);
 
-  if((dp = nameiparent(new, name)) == 0)
-    goto bad;
+  if((dp = nameiparent(new, name)) == 0)//调用namex(new,1,name)
+    goto bad;//返回的是new父节点的inode
+  //查找新路径名的最后一个元素的父目录，然后在该目录中，创建一个新的目录条目。
   ilock(dp);
   if(dp->dev != ip->dev || dirlink(dp, name, ip->inum) < 0){
     iunlockput(dp);
@@ -164,6 +165,7 @@ bad:
   end_op();
   return -1;
 }
+
 
 // Is the directory dp empty except for "." and ".." ?
 static int
@@ -280,12 +282,14 @@ create(char *path, short type, short major, short minor)
 
   iunlockput(dp);
 
+  //printf("create success\n");
   return ip;
 }
 
 uint64
 sys_open(void)
 {
+  //printf("sys_open\n");
   char path[MAXPATH];
   int fd, omode;
   struct file *f;
@@ -294,6 +298,7 @@ sys_open(void)
 
   if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
     return -1;
+
 
   begin_op();
 
@@ -313,6 +318,36 @@ sys_open(void)
       iunlockput(ip);
       end_op();
       return -1;
+    }
+  }
+
+
+  if((omode & O_NOFOLLOW)==0&&ip->type==T_SYMLINK)
+  {
+    int level=0;
+    while(ip->type==T_SYMLINK)
+    {
+      if(level>10)
+      {
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      if(readi(ip,0,(uint64)path,0,MAXPATH)<=0)
+      {
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      iunlockput(ip);
+      ip=namei(path);
+      if(ip==0)
+      {
+        end_op();
+        return -1;
+      }
+      ilock(ip);
+      level++;
     }
   }
 
@@ -482,5 +517,36 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+
+//savior 创建一个软链接
+uint64
+sys_symlink(void)
+{
+  //printf("symlink\n");
+  char new[MAXPATH],old[MAXPATH];
+  if(argstr(0,old,MAXPATH)<0||argstr(1,new,MAXPATH)<0)
+  {
+    return -1;
+  }
+
+  begin_op();
+  struct inode *ip;
+  //printf("create\n");
+  ip=create(new,T_SYMLINK,0,0);
+  if(ip==0)
+  {
+    end_op();
+    return -1;
+  }
+  //printf("writei old=%s\n",old);
+  writei(ip,0,(uint64)old,0,strlen(old));
+  // char content[MAXPATH];
+  // readi(ip,0,(uint64)content,0,MAXPATH);
+  // printf("content=%s\n",content);
+  iunlockput(ip);
+  end_op();
   return 0;
 }

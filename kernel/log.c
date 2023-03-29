@@ -58,7 +58,7 @@ initlog(int dev, struct superblock *sb)
     panic("initlog: too big logheader");
 
   initlock(&log.lock, "log");
-  log.start = sb->logstart;
+  log.start = sb->logstart;//初始化log在磁盘上的开始区域，此位置在超级块中记录
   log.size = sb->nlog;
   log.dev = dev;
   recover_from_log();
@@ -71,9 +71,9 @@ install_trans(int recovering)
   int tail;
 
   for (tail = 0; tail < log.lh.n; tail++) {
-    struct buf *lbuf = bread(log.dev, log.start+tail+1); // read log block
-    struct buf *dbuf = bread(log.dev, log.lh.block[tail]); // read dst
-    memmove(dbuf->data, lbuf->data, BSIZE);  // copy block to dst
+    struct buf *lbuf = bread(log.dev, log.start+tail+1); // read log block 磁盘上的日志块
+    struct buf *dbuf = bread(log.dev, log.lh.block[tail]); // read dst 日志块内容原本要写入的磁盘
+    memmove(dbuf->data, lbuf->data, BSIZE);  // copy block to dst 将log块的内容复制到本身的位置
     bwrite(dbuf);  // write dst to disk
     if(recovering == 0)
       bunpin(dbuf);
@@ -104,12 +104,12 @@ write_head(void)
 {
   struct buf *buf = bread(log.dev, log.start);
   struct logheader *hb = (struct logheader *) (buf->data);
-  int i;
-  hb->n = log.lh.n;
+  int i;  //log.lh.n是内存中的日志数据
+  hb->n = log.lh.n; //buf的数据部分即为logheader。
   for (i = 0; i < log.lh.n; i++) {
     hb->block[i] = log.lh.block[i];
   }
-  bwrite(buf);
+  bwrite(buf);//将缓存的内容写到磁盘上
   brelse(buf);
 }
 
@@ -131,6 +131,8 @@ begin_op(void)
     if(log.committing){
       sleep(&log, &log.lock);
     } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > LOGSIZE){
+      //log.lh.n表示有n块需要写到磁盘上
+      //outstanding表示有多少系统调用正在使用日志系统
       // this op might exhaust log space; wait for commit.
       sleep(&log, &log.lock);
     } else {
@@ -180,12 +182,12 @@ write_log(void)
 {
   int tail;
 
-  for (tail = 0; tail < log.lh.n; tail++) {
-    struct buf *to = bread(log.dev, log.start+tail+1); // log block
-    struct buf *from = bread(log.dev, log.lh.block[tail]); // cache block
-    memmove(to->data, from->data, BSIZE);
-    bwrite(to);  // write the log
-    brelse(from);
+  for (tail = 0; tail < log.lh.n; tail++) {//log.start处是日志头，之后才是日志块
+    struct buf *to = bread(log.dev, log.start+tail+1); // log block 在cache中查找是否有日志块
+    struct buf *from = bread(log.dev, log.lh.block[tail]); // cache block 在cache中查找是否有该磁盘块的内容
+    memmove(to->data, from->data, BSIZE);//将cache的数据复制到log中
+    bwrite(to);  // write the log cache中已有该日志内容，因此需要从cache写入磁盘
+    brelse(from);//使from的引用计数-1
     brelse(to);
   }
 }
@@ -194,10 +196,14 @@ static void
 commit()
 {
   if (log.lh.n > 0) {
+    //将日志数据从cache中写到磁盘的log块中
     write_log();     // Write modified blocks from cache to log
+    //将日志头写到磁盘的log块中
     write_head();    // Write header to disk -- the real commit
+    //将磁盘上log块的内容写入对应的磁盘的数据块中
     install_trans(0); // Now install writes to home locations
     log.lh.n = 0;
+    //将更新后的n=0写入磁盘的logheader上，因此旧的日志将被释放。
     write_head();    // Erase the transaction from the log
   }
 }
@@ -217,7 +223,7 @@ log_write(struct buf *b)
   int i;
 
   acquire(&log.lock);
-  if (log.lh.n >= LOGSIZE || log.lh.n >= log.size - 1)
+  if (log.lh.n >= LOGSIZE || log.lh.n >= log.size - 1)//LOGSIZE表示磁盘上日志系统的最大块数
     panic("too big a transaction");
   if (log.outstanding < 1)
     panic("log_write outside of trans");
@@ -228,7 +234,7 @@ log_write(struct buf *b)
   }
   log.lh.block[i] = b->blockno;
   if (i == log.lh.n) {  // Add new block to log?
-    bpin(b);
+    bpin(b);  //b.refcnt++;增加缓存块的引用计数，防止被逐出。
     log.lh.n++;
   }
   release(&log.lock);

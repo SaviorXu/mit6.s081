@@ -2800,8 +2800,10 @@ run(void f(char *), char *s) {
 int
 main(int argc, char *argv[])
 {
+  //printf("main1\n");
   int continuous = 0;
   char *justone = 0;
+  //printf("main\n");
 
   if(argc == 2 && strcmp(argv[1], "-c") == 0){
     continuous = 1;
