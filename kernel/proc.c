@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -256,6 +257,7 @@ growproc(int n)
   struct proc *p = myproc();
 
   sz = p->sz;
+  //printf("growproc p->sz=%d pid=%d n=%d\n",p->sz,p->pid,n);
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
@@ -264,7 +266,26 @@ growproc(int n)
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
   p->sz = sz;
+  //printf("growproc p->sz=%d pid=%d\n",p->sz,p->pid);
   return 0;
+}
+
+
+void pprint(pagetable_t pg,int level)
+{
+  //printf("print %d\n",level);
+  for(int i=0;i<512;i++)
+  {
+    pte_t pte=pg[i];
+    if(pte & PTE_V)
+    {
+        printf("pte %p pa %p\n",pte,PTE2PA(pte));
+      if((pte&PTE_V)&&(pte&(PTE_R|PTE_W|PTE_X))==0)
+      {
+        pprint((pagetable_t)PTE2PA(pte),level+1);
+      }
+    }
+  }
 }
 
 // Create a new process, copying the parent.
@@ -280,6 +301,18 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
+
+  //pprint(p->pagetable,0);
+  //p是父进程，np是子进程
+  // for(int i=0;i<16;i++)
+  // {
+  //   if(p->vmas[i].valid==1)
+  //   {
+  //     memmove(&np->vmas[i],&p->vmas[i],sizeof(p->vmas[i]));
+  //     //printf("fork va=%p\n",p->vmas[i].addr);
+  //     filedup(np->vmas[i].ffile);
+  //   }
+  // }
 
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
@@ -315,6 +348,17 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
+  //printf("p->sz=%p\n",p->sz);
+  for(int i=0;i<16;i++)
+  {
+    if(p->vmas[i].valid==1)
+    {
+      memmove(&np->vmas[i],&p->vmas[i],sizeof(p->vmas[i]));
+      //printf("fork va=%p\n",p->vmas[i].addr);
+      filedup(np->vmas[i].ffile);
+    }
+  }
+  
   return pid;
 }
 
@@ -339,10 +383,30 @@ reparent(struct proc *p)
 void
 exit(int status)
 {
+  //printf("exit\n");
   struct proc *p = myproc();
+  //printf("exit pid=%d\n",p->pid);
 
   if(p == initproc)
     panic("init exiting");
+
+  for(int i=0;i<16;i++)
+  {
+    if(p->vmas[i].valid==1)
+    { 
+      if(p->vmas[i].flags & MAP_SHARED)
+      {
+        //printf("filewrite\n");
+        filewrite(p->vmas[i].ffile,p->vmas[i].addr,p->vmas[i].length);
+      }
+      //printf("p->vmas[i].addr=%p\n",p->vmas[i].addr);
+      uvmunmap(p->pagetable,p->vmas[i].addr,p->vmas[i].length/PGSIZE,1);
+      p->vmas[i].valid=0;
+      p->vmas[i].length=0;
+      p->vmas[i].prot=0;
+    }
+  }
+
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
@@ -373,6 +437,7 @@ exit(int status)
 
   release(&wait_lock);
 
+  //printf("before sched\n");
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -603,7 +668,7 @@ int
 either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 {
   struct proc *p = myproc();
-  if(user_dst){
+  if(user_dst){//用户虚拟空间
     return copyout(p->pagetable, dst, src, len);
   } else {
     memmove((char *)dst, src, len);

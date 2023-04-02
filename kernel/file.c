@@ -134,10 +134,14 @@ fileread(struct file *f, uint64 addr, int n)
 int
 filewrite(struct file *f, uint64 addr, int n)
 {
+  //printf("filewrite\n");
   int r, ret = 0;
 
   if(f->writable == 0)
+  {
     return -1;
+  }
+    
 
   if(f->type == FD_PIPE){
     ret = pipewrite(f->pipe, addr, n);

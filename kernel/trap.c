@@ -5,6 +5,11 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+//savior
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -29,6 +34,60 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+void print(pagetable_t pg,uint64 addr,int level)
+{
+  //printf("print %d\n",level);
+  for(int i=0;i<512;i++)
+  {
+    pte_t pte=pg[i];
+    if(pte & PTE_V)
+    {
+      if(addr==PTE2PA(pte))
+      {
+        printf("pte %p pa %p\n",pte,addr);
+        return;
+      }
+      if((pte&PTE_V)&&(pte&(PTE_R|PTE_W|PTE_X))==0)
+      {
+        print((pagetable_t)PTE2PA(pte),addr,level+1);
+      }
+    }
+  }
+}
+
+int PageFault(struct proc *p,uint64 stval)
+{
+  //不要忘了判断地址需要大于p->trapframe->sp(进程的栈底)
+  if(stval>=MAXVA||(stval>=KERNBASE&&stval<PHYSTOP)||stval<p->trapframe->sp||stval>=p->sz)
+  {
+    return -1;
+  }
+  for(int i=0;i<16;i++)
+  {
+    if(p->vmas[i].valid&&p->vmas[i].addr<=stval&&p->vmas[i].addr+p->vmas[i].length>stval)
+    {
+      char *mem=kalloc();
+      if(mem==0)
+      {
+        return -1;
+      }
+      memset(mem,0,PGSIZE);
+      
+      readi(p->vmas[i].ffile->ip,0,(uint64)mem,stval-p->vmas[i].addr,PGSIZE);
+      int mode=PTE_U;//不要忘记PTE_U 表示用户态可以使用
+      if(p->vmas[i].prot & PROT_READ) mode|=PTE_R; 
+      if(p->vmas[i].prot & PROT_WRITE) mode|=PTE_W;
+      if(p->vmas[i].prot & PROT_EXEC) mode|=PTE_X;
+      if(mappages(p->pagetable,stval,PGSIZE,(uint64)mem,mode)!=0)
+      {
+        printf("mappages fail\n");
+        kfree(mem);
+        return -1;
+      }
+    }
+  }
+  return 0;
+}
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -68,9 +127,18 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    p->killed = 1;
+    if(r_scause()==13||r_scause()==15)
+    {
+      if(PageFault(p,r_stval())==-1)
+      {
+        p->killed=1;
+      }
+    }else
+    {
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    }
   }
 
   if(p->killed)

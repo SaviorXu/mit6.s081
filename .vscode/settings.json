@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "istream": "cpp",
+        "locale": "cpp",
+        "fcntl.h": "c",
+        "fs.h": "c",
+        "file.h": "c",
+        "defs.h": "c"
+    }
+}

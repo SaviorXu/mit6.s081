@@ -100,6 +100,7 @@ sys_close(void)
   if(argfd(0, &fd, &f) < 0)
     return -1;
   myproc()->ofile[fd] = 0;
+  //printf("fd=%d ref=%d\n",fd,f->ref);
   fileclose(f);
   return 0;
 }
@@ -481,6 +482,82 @@ sys_pipe(void)
     fileclose(rf);
     fileclose(wf);
     return -1;
+  }
+  return 0;
+}
+
+uint64 sys_mmap(void)
+{
+  printf("mmap\n");
+  struct proc *p=myproc();
+  int prot,flags,length;//不要乱用int和uint64
+  struct file *ffile;
+  if(argint(1,&length)<0||argint(2,&prot)<0||argint(3,&flags)<0||argfd(4,0,&ffile)<0)
+  {
+    //printf("return -1\n");
+    return -1;
+  }
+  if((flags & MAP_SHARED)&&!ffile->writable&&(prot & PROT_WRITE)){
+    return -1;
+  }
+  int i;
+  for(i=0;i<16;i++)
+  {
+    if(p->vmas[i].valid==0)
+    {
+      break;
+    }
+  }
+  //printf("mmap p->sz=%p\n",p->sz);
+  p->vmas[i].valid=1;
+  p->vmas[i].addr=p->sz;
+  p->vmas[i].length=length;
+  p->vmas[i].prot=prot;
+  p->vmas[i].flags=flags;
+  p->vmas[i].offset=0;
+  p->vmas[i].ffile=ffile;
+  p->sz+=length;
+  filedup(ffile);
+  return p->vmas[i].addr;
+}
+
+uint64 sys_munmap(void)
+{
+  struct proc *p=myproc();
+  uint64 addr;
+  int length;
+  if(argaddr(0,&addr)<0||argint(1,&length)<0)
+  {
+    return -1;
+  }
+  int i;
+  for(i=0;i<16;i++)
+  {
+    if(p->vmas[i].addr>=addr&&addr<p->vmas[i].addr+p->vmas[i].length)
+    {
+      break;
+    }
+  }
+  if(i==16)
+  {
+    return 0;
+  }
+  if(p->vmas[i].flags & MAP_SHARED)
+  {
+    filewrite(p->vmas[i].ffile,addr,length);
+  }
+  uvmunmap(p->pagetable,addr,length/PGSIZE,1);
+  //printf("p->pid=%d length=%d\n",p->pid,length);
+  if(length==p->vmas[i].length)
+  {
+    p->vmas[i].valid=0;
+    p->vmas[i].length=0;
+    p->vmas[i].prot=0;
+  }else
+  {
+    //printf("munmap else\n");
+    p->vmas[i].length-=length;
+    p->vmas[i].addr+=length;
   }
   return 0;
 }
