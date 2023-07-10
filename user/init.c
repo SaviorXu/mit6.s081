@@ -30,12 +30,12 @@ main(void)
       printf("init: fork failed\n");
       exit(1);
     }
-    if(pid == 0){
+    if(pid == 0){//子进程
       exec("sh", argv);
       printf("init: exec sh failed\n");
       exit(1);
     }
-
+    //父进程；父进程等待子进程退出
     for(;;){
       // this call to wait() returns if the shell exits,
       // or if a parentless process exits.

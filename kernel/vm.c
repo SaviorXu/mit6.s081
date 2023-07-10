@@ -24,6 +24,7 @@ kvmmake(void)
   kpgtbl = (pagetable_t) kalloc();
   memset(kpgtbl, 0, PGSIZE);
 
+  //kvmmap的第二个参数表示虚拟地址，第三个参数表示物理地址。可以看出是直接映射
   // uart registers
   kvmmap(kpgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W);
 
@@ -77,6 +78,7 @@ kvminithart()
 //   21..29 -- 9 bits of level-1 index.
 //   12..20 -- 9 bits of level-0 index.
 //    0..11 -- 12 bits of byte offset within the page.
+//给定虚拟地址，找到该地址对应的pte。如果pte不存在，则分配一页
 pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
@@ -84,16 +86,22 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     panic("walk");
 
   for(int level = 2; level > 0; level--) {
+    //PX表示将虚拟地址右移。最高层需要移动30位。（12位页内偏移，还有2*9）
     pte_t *pte = &pagetable[PX(level, va)];
     if(*pte & PTE_V) {
+      //如果页表项是有效的。该页表项中的真实的物理地址将是下一层页表的基地址。
       pagetable = (pagetable_t)PTE2PA(*pte);
     } else {
+      //如果不存在页表项，若alloc为1，为该pte指向的下一层页表分配一页。
       if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
         return 0;
+      //一切清0，新分配的下一级页表的所有PTE都是无效的。
       memset(pagetable, 0, PGSIZE);
+      //更新PTE
       *pte = PA2PTE(pagetable) | PTE_V;
     }
   }
+  //返回level0对应的页表项
   return &pagetable[PX(0, va)];
 }
 
@@ -143,7 +151,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   if(size == 0)
     panic("mappages: size");
   
-  a = PGROUNDDOWN(va);
+  a = PGROUNDDOWN(va);//以4096为单位取整
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
     if((pte = walk(pagetable, a, 1)) == 0)

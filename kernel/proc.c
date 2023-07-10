@@ -101,6 +101,7 @@ allocpid() {
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
 // If there are no free procs, or a memory allocation fails, return 0.
+//xv6的最大进程数为64，proc数组保存了所有的进程。遍历整个数组，查找状态是未使用的进程
 static struct proc*
 allocproc(void)
 {
@@ -147,8 +148,11 @@ found:
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
-  p->context.ra = (uint64)forkret;
+
+  // printf("proc.c allocproc p->pid=%d ra=%p\n",p->pid,(uint64)forkret);
+  p->context.ra = (uint64)forkret;//ra保存的是当前函数的返回地址
   p->context.sp = p->kstack + PGSIZE;
+  //系统初始化时，初始了64个进程的内核栈空间。此时将栈指针指向栈底，即大的地址。
 
 
   return p;
@@ -536,10 +540,11 @@ forkret(void)
     // File system initialization must be run in the context of a
     // regular process (e.g., because it calls sleep), and thus cannot
     // be run from main().
+    // printf("proc.c forkret first==1 id=%d forkret=%p\n",myproc()->pid,myproc()->context.ra);
     first = 0;
-    fsinit(ROOTDEV);
+    fsinit(ROOTDEV);//此进程执行fsinit会从磁盘读数据，导致其编程睡眠状态
   }
-
+  // printf("proc.c fsinit usertrapret\n");
   usertrapret();
 }
 
@@ -621,10 +626,10 @@ kill(int pid)
 // Returns 0 on success, -1 on error.
 int
 either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
-{
+{//user_dst==1,用户虚拟地址
   struct proc *p = myproc();
   if(user_dst){
-    return copyout(p->pagetable, dst, src, len);
+    return copyout(p->pagetable, dst, src, len);//从内核拷贝到用户
   } else {
     memmove((char *)dst, src, len);
     return 0;

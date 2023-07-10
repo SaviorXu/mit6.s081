@@ -89,6 +89,7 @@ usertrap(void)
 void
 usertrapret(void)
 {
+  
   struct proc *p = myproc();
 
   // we're about to switch the destination of traps from

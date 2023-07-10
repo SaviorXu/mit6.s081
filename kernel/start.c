@@ -3,7 +3,7 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "defs.h"
-
+//执行一些在机器模式下才允许的配置，并切换到监管模式
 void main();
 void timerinit();
 
@@ -28,12 +28,15 @@ start()
 
   // set M Exception Program Counter to main, for mret.
   // requires gcc -mcmodel=medany
+  //mret后跳转到main函数
   w_mepc((uint64)main);
 
   // disable paging for now.
+  //禁用处理器的地址转换，直接使用物理地址
   w_satp(0);
 
   // delegate all interrupts and exceptions to supervisor mode.
+  //让内核代码处理所有的中断和异常
   w_medeleg(0xffff);
   w_mideleg(0xffff);
   w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
@@ -47,10 +50,12 @@ start()
   timerinit();
 
   // keep each CPU's hartid in its tp register, for cpuid().
+  //将CPU的id保存在寄存器tp中
   int id = r_mhartid();
   w_tp(id);
 
   // switch to supervisor mode and jump to main().
+  //转换成内核并跳转至main
   asm volatile("mret");
 }
 
@@ -65,6 +70,7 @@ timerinit()
   int id = r_mhartid();
 
   // ask the CLINT for a timer interrupt.
+  //设置中断时间间隔0.1s
   int interval = 1000000; // cycles; about 1/10th second in qemu.
   *(uint64*)CLINT_MTIMECMP(id) = *(uint64*)CLINT_MTIME + interval;
 
@@ -78,11 +84,14 @@ timerinit()
   w_mscratch((uint64)scratch);
 
   // set the machine-mode trap handler.
+  //mtvec寄存器用于指令中断处理程序的入口地址。
   w_mtvec((uint64)timervec);
 
   // enable machine-mode interrupts.
+  //打开中断
   w_mstatus(r_mstatus() | MSTATUS_MIE);
 
   // enable machine-mode timer interrupts.
+  //打开时钟中断
   w_mie(r_mie() | MIE_MTIE);
 }

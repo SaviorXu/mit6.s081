@@ -9,6 +9,9 @@ _entry:
         # stack0 is declared in start.c,
         # with a 4096-byte stack per CPU.
         # sp = stack0 + (hartid * 4096)
+        #mhartid:运行当前代码硬件线程的ID
+        #可以为每个线程分配不同的栈空间，避免线程之间的栈冲突
+        #根据线程ID计算出当前线程的栈大小，并将栈指针设置为当前线程的栈顶
         la sp, stack0
         li a0, 1024*4
 	csrr a1, mhartid

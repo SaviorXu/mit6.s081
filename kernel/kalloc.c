@@ -11,6 +11,7 @@
 
 void freerange(void *pa_start, void *pa_end);
 
+
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
@@ -30,13 +31,16 @@ kinit()
   freerange(end, (void*)PHYSTOP);
 }
 
+//从kernel data开始，到PHYSTOP。每个大小是PGSIZE
 void
 freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  {
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by v,
@@ -65,6 +69,7 @@ kfree(void *pa)
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
 // Returns 0 if the memory cannot be allocated.
+//分配4096大小的内存，即从内存的空闲链表中选取一个。
 void *
 kalloc(void)
 {

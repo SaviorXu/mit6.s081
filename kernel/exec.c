@@ -23,19 +23,20 @@ exec(char *path, char **argv)
 
   begin_op();
 
-  if((ip = namei(path)) == 0){
+  if((ip = namei(path)) == 0){//找到该路径对应的inode
     end_op();
     return -1;
   }
   ilock(ip);
 
+  //从inode中读取数据到elf，elf属于内核虚拟地址
   // Check ELF header
   if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;
   if(elf.magic != ELF_MAGIC)
     goto bad;
 
-  if((pagetable = proc_pagetable(p)) == 0)
+  if((pagetable = proc_pagetable(p)) == 0)//分配一个页表，且已经建立了trampoline和trapframe
     goto bad;
 
   // Load program into memory.
@@ -64,6 +65,7 @@ exec(char *path, char **argv)
   p = myproc();
   uint64 oldsz = p->sz;
 
+  //exec首先分配两页物理帧。第一页用作保护页，第二页留给用户栈。
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
   sz = PGROUNDUP(sz);
@@ -71,7 +73,7 @@ exec(char *path, char **argv)
   if((sz1 = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
   sz = sz1;
-  uvmclear(pagetable, sz-2*PGSIZE);
+  uvmclear(pagetable, sz-2*PGSIZE);//将PTE_U设为无效，在用户空间无法访问
   sp = sz;
   stackbase = sp - PGSIZE;
 
@@ -114,7 +116,7 @@ exec(char *path, char **argv)
   p->sz = sz;
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
-  proc_freepagetable(oldpagetable, oldsz);
+  proc_freepagetable(oldpagetable, oldsz);//清除旧页表
 
   if(p->pid==1)
   {

@@ -100,7 +100,9 @@ struct proc {
   uint64 kstack;               // Virtual address of kernel stack
   uint64 sz;                   // Size of process memory (bytes)
   pagetable_t pagetable;       // User page table
+  //用户态陷入内核态时保存用户寄存器的地方
   struct trapframe *trapframe; // data page for trampoline.S
+  //上下文切换的时候保存寄存器
   struct context context;      // swtch() here to run process
   //add pid
   struct usyscall *usys;
